@@ -1,0 +1,63 @@
+# Текст на сервере: своя клетка и потолок, чтобы распознавание не отняло процессор и память
+# у соседних служб (Качалка, Кружок, DNS Чисто).
+# Код и модели: /opt/tekst (root:root 644), Python-пакеты: /opt/tekst/venv,
+# скачанное своим сервером Telegram: /var/lib/tekst-tgapi,
+# данные: /var/lib/tekst-bot (bot.token, auto.json, stats.json, thanks.jsonl), записи в работе: /var/cache/tekst-bot.
+[Unit]
+Description=Tekst Telegram bot (voice -> text)
+After=network-online.target tekst-tgapi.service
+Wants=network-online.target tekst-tgapi.service
+# без токена не стартуем (кладёт deploy/token.sh)
+ConditionPathExists=/var/lib/tekst-bot/bot.token
+
+[Service]
+User=tekstbot
+Group=tekstbot
+WorkingDirectory=/opt/tekst
+ExecStart=/opt/tekst/venv/bin/python -I /opt/tekst/tekst.py
+Environment=TEKST_DATA=/var/lib/tekst-bot
+Environment=TEKST_WORK=/var/cache/tekst-bot
+Environment=TEKST_MODELS=/opt/tekst/models
+Environment=TEKST_THREADS=1
+Environment=OMP_NUM_THREADS=1
+Environment=HOME=/var/lib/tekst-bot
+Environment=HF_HUB_OFFLINE=1
+# свой сервер Telegram (tekst-tgapi): файлы до 2 ГБ, скачанное лежит в /var/lib/tekst-tgapi — после расшифровки удаляем
+Environment=TEKST_TG_API=http://127.0.0.1:8082
+Environment=TEKST_TG_LOCAL=1
+Environment=TEKST_TG_DIR=/var/lib/tekst-tgapi
+ReadWritePaths=-/var/lib/tekst-tgapi
+StateDirectory=tekst-bot
+CacheDirectory=tekst-bot
+Restart=always
+RestartSec=5
+
+# потолок: одно ядро из трёх, 1,5 ГБ памяти (GigaAM ~0,5 ГБ, с Whisper ~1,2 ГБ), ниже Качалки по приоритету
+CPUQuota=100%
+MemoryHigh=1300M
+MemoryMax=1536M
+TasksMax=64
+Nice=10
+IOSchedulingClass=idle
+
+# клетка: видит только свою папку, в чужие (Качалка, Кружок, ключи) не заглядывает
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# наружу — только в интернет (Telegram); внутренние сети закрыты
+IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

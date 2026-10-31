@@ -1,0 +1,42 @@
+# Свой сервер Telegram для Текста: боты через него скачивают файлы до 2 ГБ (обычный Telegram — до 20 МБ).
+# Отдельный от сервера Качалки: работает от пользователя tekstbot, поэтому Текст может удалять
+# скачанные записи, а в файлы Качалки не заглядывает. Ключи api_id/api_hash — общие, из /etc/telegram-bot-api/env.
+[Unit]
+Description=Telegram Bot API server, local mode: files up to 2000 MB (Tekst bot)
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/telegram-bot-api/env
+
+[Service]
+User=tekstbot
+Group=tekstbot
+EnvironmentFile=/etc/telegram-bot-api/env
+ExecStart=/usr/local/bin/telegram-bot-api --local --http-ip-address=127.0.0.1 --http-port=8082 --dir=/var/lib/tekst-tgapi --temp-dir=/var/lib/tekst-tgapi/tmp --verbosity=1
+ExecStartPre=/bin/mkdir -p /var/lib/tekst-tgapi/tmp
+StateDirectory=tekst-tgapi
+StateDirectoryMode=0700
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+CPUQuota=50%
+MemoryMax=600M
+TasksMax=128
+Nice=10
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+
+[Install]
+WantedBy=multi-user.target
